@@ -5,8 +5,8 @@ import sys
 from filecmp import dircmp
 
 from libs.args import parse_arguments
-from libs.console_utils import ask_yes_no
 from libs.beautifultable.beautifultable import BeautifulTable
+from libs.console_utils import ask_yes_no
 from libs.cprint import cprint, error_exit
 
 

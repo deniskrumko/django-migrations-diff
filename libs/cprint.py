@@ -2,6 +2,7 @@ __all__ = ('color_msg', 'cprint', 'error_exit')
 
 
 def color_msg(msg, color):
+    """Function to get colored image."""
     color_map = {
         'red': 91,
         'green': 92,
@@ -12,8 +13,10 @@ def color_msg(msg, color):
 
 
 def cprint(msg, color=None):
+    """Method to do colored print."""
     print('\n  {}'.format(color_msg(msg, color) if color else msg))
 
 
 def error_exit(msg):
+    """Shortcut to exit and show red message."""
     exit('\n  {}'.format(color_msg(msg, 'red')))
