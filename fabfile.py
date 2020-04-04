@@ -42,8 +42,18 @@ def install():
 
 @task
 def clean():
-    """Clean before build."""
-    local(f'rm -rf build dist {base_dir}.egg-info __pycache__')
+    """Clean unused files before build."""
+    files = (
+        'build',
+        'dist',
+        '__pycache__',
+        '.DS_Store',
+        f'{base_dir}.egg-info',
+        f'{base_dir}/__pycache__',
+        f'{base_dir}/snapshots',
+        f'{base_dir}/.DS_Store',
+    )
+    local('rm -rf ' + ' '.join(files))
 
 
 @task
