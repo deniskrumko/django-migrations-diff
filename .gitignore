@@ -1,3 +1,7 @@
 __pycache__
 .DS_Store
 snapshots/
+todo.md
+build
+dist
+*.egg-info
