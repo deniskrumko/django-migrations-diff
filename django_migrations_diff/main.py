@@ -1,7 +1,9 @@
 import os
 import shutil
 import sys
+from collections import defaultdict
 from datetime import datetime
+from filecmp import dircmp
 from pathlib import Path, PosixPath
 from typing import Tuple
 
@@ -12,10 +14,16 @@ class DjangoMigrationsDiff:
     def __init__(self):
         """Initialize class instance."""
         self.args = sys.argv[1:]
+        self.empty = '---'
+        self.app_title = 'APPLICATION'
 
         self._current_dir = None
         self._app_dir = None
         self._snapshots_dir = None
+
+        self._comparison = None
+        self._apps = None
+        self._spacing = None
 
     def run(self):
         # Show help
@@ -98,9 +106,38 @@ class DjangoMigrationsDiff:
             else:
                 self.print(f'<r>not found</r>')
 
-    def compare_snapshots(self, *names):
-        print(f'compare: {names}')
-        raise NotImplementedError
+    def compare_snapshots(self, *names: tuple):
+        """Compare migrations between several snapshots."""
+        self.names = [name.upper() for name in names]
+        if len(self.names) > 2:
+            # TODO: maybe it's not needed to anyone?
+            return self.print(
+                '\n<r>Sorry, only 2 snapshots can be compared yet</r>'
+            )
+
+        if not self.comparison:
+            return self.print(
+                f'\nSnapshots <g>{names[0]}</g> and <g>{names[1]}</g> '
+                'are equal!'
+            )
+
+        self.print_line(left='┌', delimiter='┬', right='┐')
+        self.print_line(self.app_title, *self.names, wraps=('B', 'B', 'B'))
+
+        for app, files in self.comparison.items():
+            self.print_line(left='├', delimiter='┼', right='┤')
+            files = sorted(
+                files,
+                key=lambda x: x[0] if x[0] != self.empty else x[1]
+            )
+            for i, ab in enumerate(files):
+                a, b = ab
+                if i == 0:
+                    self.print_line(app, a, b)
+                else:
+                    self.print_line('', a, b)
+
+        self.print_line(left='└', delimiter='┴', right='┘')
 
     def show_all_snapshots(self) -> bool:
         """Show all existing snapshots.
@@ -172,6 +209,75 @@ class DjangoMigrationsDiff:
 
         return self._snapshots_dir
 
+    @property
+    def comparison(self):
+        """TODO"""
+        if not self._comparison:
+            self._comparison = defaultdict(list)
+
+            for app in sorted(self.apps):
+                a_dir = self.snapshots_dir / self.names[0] / app
+                b_dir = self.snapshots_dir / self.names[1] / app
+
+                if not a_dir.exists():
+                    for filename in os.listdir(b_dir):
+                        self._comparison[app].append((self.empty, filename))
+                elif not b_dir.exists():
+                    for filename in os.listdir(a_dir):
+                        self._comparison[app].append((filename, self.empty))
+                else:
+                    compare = dircmp(a_dir, b_dir)
+
+                    for filename in compare.left_only:
+                        self._comparison[app].append((filename, self.empty))
+
+                    for filename in compare.right_only:
+                        self._comparison[app].append((self.empty, filename))
+
+                    for filename in compare.diff_files:
+                        self._comparison[app].append((filename, filename))
+
+        return self._comparison
+
+    @property
+    def apps(self):
+        """TODO"""
+        if not self._apps:
+            self._apps = set()
+            for name in self.names:
+                snapshot_dir = self.snapshots_dir / name
+                if not snapshot_dir.exists():
+                    self.print(f'\nSnapshot <r>{name}</r> doesn\'t exist')
+                    exit()
+
+                self._apps |= set(os.listdir(snapshot_dir))
+
+        return self._apps
+
+    @property
+    def spacing(self):
+        """TODO"""
+        if not self._spacing:
+            max_app = len(self.app_title)
+            max_name_1 = len(self.names[0])
+            max_name_2 = len(self.names[1])
+
+            for app, files in self.comparison.items():
+                app_len = len(app)
+                if app_len > max_app:
+                    max_app = app_len
+
+                for filename in files:
+                    name_1, name_2 = len(filename[0]), len(filename[1])
+                    if name_1 > max_name_1:
+                        max_name_1 = name_1
+                    if name_2 > max_name_2:
+                        max_name_2 = name_2
+
+            self._spacing = max_app + 1, max_name_1 + 1, max_name_2 + 1
+
+        return self._spacing
+
     def create_snapshot_dir(
         self,
         name: str,
@@ -182,7 +288,7 @@ class DjangoMigrationsDiff:
         if new_snapshot_dir.exists():
             date = self.get_created_date(new_snapshot_dir)
             self.input(
-                f'\nSnapshot <g>{name}</g> already exists (since {date}). '
+                f'\nSnapshot <g>{name}</g> ({date}) will be updated. '
                 'Press Enter to continue...', end=''
             )
             shutil.rmtree(new_snapshot_dir)
@@ -216,18 +322,48 @@ class DjangoMigrationsDiff:
     def print(self, msg: str = '', **kwargs):
         """Print colored message in console."""
         if msg:
-            colors = {
+            modificators = {
                 'b': ('\x1b[34m\x1b[22m', '\x1b[39m\x1b[22m'),  # blue
                 'g': ('\x1b[32m\x1b[22m', '\x1b[39m\x1b[22m'),  # green
                 'r': ('\x1b[31m\x1b[22m', '\x1b[39m\x1b[22m'),  # red
                 'y': ('\x1b[33m\x1b[22m', '\x1b[39m\x1b[22m'),  # yellow
+                'B': ('\033[1m', '\033[0m'),                    # bold
+                'D': ('\033[2m', '\033[0m'),                    # dim
             }
 
-            for name, data in colors.items():
+            for name, data in modificators.items():
                 msg = msg.replace(f'<{name}>', data[0])
                 msg = msg.replace(f'</{name}>', data[1])
 
         print(msg, **kwargs)
+
+    def print_line(
+        self, *values, wraps=None, left='│', empty='─', delimiter='│',
+        right='│'
+    ):
+        """TODO"""
+        if not values:
+            self.print(f'<D>{left}', end='')
+            for index, sp in enumerate(self.spacing):
+                end = delimiter if index + 1 != len(self.spacing) else ''
+                self.print(empty * sp + empty + end, end='')
+            self.print(f'{right}</D>')
+        else:
+            # TODO: Make 1 case instead of 2
+            empty = ' '
+            self.print(f'<D>{left}</D>', end='')
+            for index, sp in enumerate(self.spacing):
+                end = (
+                    f'<D>{delimiter}</D>'
+                    if index + 1 != len(self.spacing) else ''
+                )
+                value = values[index]
+                spaced = sp - len(value)
+                if wraps:
+                    w = wraps[index]
+                    value = f'<{w}>{value}</{w}>'
+                self.print(empty + value + spaced * empty + end, end='')
+            self.print(f'<D>{right}</D>')
 
     def input(self, msg: str, **kwargs):
         """Print colored message and ask input."""
