@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime
 from filecmp import dircmp
 from pathlib import Path, PosixPath
-from typing import Tuple
+from typing import List, Optional, Set, Tuple
 
 
 class DjangoMigrationsDiff:
@@ -16,6 +16,7 @@ class DjangoMigrationsDiff:
         self.args = sys.argv[1:]
         self.empty = '---'
         self.app_title = 'APPLICATION'
+        self.names = []
 
         self._current_dir = None
         self._app_dir = None
@@ -26,6 +27,7 @@ class DjangoMigrationsDiff:
         self._spacing = None
 
     def run(self):
+        """Run application."""
         # Show help
         if not self.args or 'help' in self.args[0]:
             return self.show_help()
@@ -38,6 +40,10 @@ class DjangoMigrationsDiff:
         if self.args[0] == 'rm':
             return self.remove_snapshots(*self.args[1:])
 
+        # Remove snapshots
+        if self.args[0] in ('-v', '--version'):
+            return self.get_version()
+
         # Create snapshot
         if len(self.args) == 1:
             return self.create_snapshot(self.args[0])
@@ -47,12 +53,15 @@ class DjangoMigrationsDiff:
 
     def create_snapshot(self, name: str):
         """Create new snapshot (or update old one)."""
-        new_snapshot_dir, created = self.create_snapshot_dir(name)
+        new_snapshot_dir, created = None, None
         total_apps, total_files = 0, 0
 
         for root, dirs, files in os.walk(self.current_dir):
             root = Path(root)
             if root.name == 'migrations' and files:
+                if not new_snapshot_dir:
+                    new_snapshot_dir, created = self.create_snapshot_dir(name)
+
                 destination_dir = self.create_app_migrations_dir(
                     snapshot_dir=new_snapshot_dir,
                     root=root,
@@ -68,6 +77,11 @@ class DjangoMigrationsDiff:
 
                 total_apps += 1
 
+        if not total_files:
+            return self.print(
+                f'\n<r>Can\'t find any migration in {self.current_dir}</r>'
+            )
+
         action = 'created' if created else 'updated'
         return self.print(
             f'\nSnapshot <g>{name}</g> successfully {action}:\n'
@@ -75,7 +89,7 @@ class DjangoMigrationsDiff:
             f'  - {total_files} migrations'
         )
 
-    def remove_snapshots(self, *names: tuple):
+    def remove_snapshots(self, *names: Tuple[str, ...]):
         """Remove all snapshots or specific ones."""
         if not names:
             return self.print(
@@ -106,11 +120,11 @@ class DjangoMigrationsDiff:
             else:
                 self.print(f'<r>not found</r>')
 
-    def compare_snapshots(self, *names: tuple):
+    def compare_snapshots(self, *names: Tuple[str, ...]):
         """Compare migrations between several snapshots."""
-        self.names = [name.upper() for name in names]
+        self.names = names
         if len(self.names) > 2:
-            # TODO: maybe it's not needed to anyone?
+            # NOTE: maybe it's not needed to anyone?
             return self.print(
                 '\n<r>Sorry, only 2 snapshots can be compared yet</r>'
             )
@@ -122,20 +136,25 @@ class DjangoMigrationsDiff:
             )
 
         self.print_line(left='┌', delimiter='┬', right='┐')
-        self.print_line(self.app_title, *self.names, wraps=('B', 'B', 'B'))
+        self.print_line(
+            self.app_title,
+            *[n.upper() for n in names],
+            wraps=['B'] * 3,
+        )
 
         for app, files in self.comparison.items():
             self.print_line(left='├', delimiter='┼', right='┤')
-            files = sorted(
+            for index, filenames in enumerate(sorted(
                 files,
                 key=lambda x: x[0] if x[0] != self.empty else x[1]
-            )
-            for i, ab in enumerate(files):
-                a, b = ab
-                if i == 0:
-                    self.print_line(app, a, b)
+            )):
+                wraps = [None]  # app name is not wrapped
+                if filenames[0] == filenames[1]:
+                    wraps += ['y', 'y']  # same filenames colored as yellow
                 else:
-                    self.print_line('', a, b)
+                    for name in filenames:
+                        wraps.append('r' if name == self.empty else 'g')
+                self.print_line('' if index else app, *filenames, wraps=wraps)
 
         self.print_line(left='└', delimiter='┴', right='┘')
 
@@ -177,8 +196,16 @@ class DjangoMigrationsDiff:
         return True
 
     def show_help(self):
-        print('help')
-        raise NotImplementedError
+        """Show help for CLI."""
+        from .help_text import HELP
+
+        self.print(HELP)
+
+    def get_version(self):
+        """Get current version."""
+        from . import get_version
+
+        self.print(f'\nCurrent version is <g>{get_version()}</g>')
 
     # Helpers
 
@@ -210,8 +237,17 @@ class DjangoMigrationsDiff:
         return self._snapshots_dir
 
     @property
-    def comparison(self):
-        """TODO"""
+    def comparison(self) -> dict:
+        """Get comparison between two snapshots.
+
+        Dictionary contains all apps from two snapshots. Each app contains
+        pair of filenames like ('0001_initial.py', '---'), that means that
+        file exists is first snapshot only.
+
+        Pair like ('0001_initial.py', '0001_initial.py') means that files
+        are different by content even they have same name.
+
+        """
         if not self._comparison:
             self._comparison = defaultdict(list)
 
@@ -240,8 +276,8 @@ class DjangoMigrationsDiff:
         return self._comparison
 
     @property
-    def apps(self):
-        """TODO"""
+    def apps(self) -> Set[str]:
+        """Get set of all available apps from all snapshots."""
         if not self._apps:
             self._apps = set()
             for name in self.names:
@@ -255,8 +291,13 @@ class DjangoMigrationsDiff:
         return self._apps
 
     @property
-    def spacing(self):
-        """TODO"""
+    def spacing(self) -> Tuple[int, int, int]:
+        """Get spacing between app name and two snapshot names.
+
+        Method searches for longest app name and longest name for each
+        snapshot. That will be used in comparison display.
+
+        """
         if not self._spacing:
             max_app = len(self.app_title)
             max_name_1 = len(self.names[0])
@@ -338,32 +379,32 @@ class DjangoMigrationsDiff:
         print(msg, **kwargs)
 
     def print_line(
-        self, *values, wraps=None, left='│', empty='─', delimiter='│',
-        right='│'
+        self,
+        *values: Tuple[str, ...],
+        wraps: Optional[List[str]] = None,
+        empty: str = '─',
+        left: str = '│',
+        delimiter: str = '│',
+        right: str = '│',
     ):
-        """TODO"""
-        if not values:
-            self.print(f'<D>{left}', end='')
-            for index, sp in enumerate(self.spacing):
-                end = delimiter if index + 1 != len(self.spacing) else ''
-                self.print(empty * sp + empty + end, end='')
-            self.print(f'{right}</D>')
-        else:
-            # TODO: Make 1 case instead of 2
-            empty = ' '
-            self.print(f'<D>{left}</D>', end='')
-            for index, sp in enumerate(self.spacing):
-                end = (
-                    f'<D>{delimiter}</D>'
-                    if index + 1 != len(self.spacing) else ''
-                )
-                value = values[index]
-                spaced = sp - len(value)
+        """Print table line."""
+        empty = ' ' if values else f'<D>{empty}</D>'
+        self.print(f'<D>{left}</D>', end='')
+
+        for i, spacing in enumerate(self.spacing):
+            end = f'<D>{delimiter}</D>' if i + 1 != len(self.spacing) else ''
+            if values:
+                value = values[i]
+                after_value = spacing - len(value)
                 if wraps:
-                    w = wraps[index]
-                    value = f'<{w}>{value}</{w}>'
-                self.print(empty + value + spaced * empty + end, end='')
-            self.print(f'<D>{right}</D>')
+                    wrapper = wraps[i]
+                    if wrapper:
+                        value = f'<{wrapper}>{value}</{wrapper}>'
+                self.print(empty + value + after_value * empty + end, end='')
+            else:
+                self.print(empty * (spacing + 1) + end, end='')
+
+        self.print(f'<D>{right}</D>')
 
     def input(self, msg: str, **kwargs):
         """Print colored message and ask input."""
@@ -385,6 +426,7 @@ class DjangoMigrationsDiff:
 
 
 def main():
+    """Main function that runs application."""
     DjangoMigrationsDiff().run()
 
 
