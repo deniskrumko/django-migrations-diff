@@ -13,4 +13,4 @@ HELP = """
   mdiff <g>rm all</g></b>\t\t\tRemove all snapshots
   mdiff <g>rm</g> <b><name_1></b> <b><name_2></b>\tRemove specific snapshots
 
-""".strip() # noqa
+""".rstrip() # noqa
