@@ -7,20 +7,30 @@ from filecmp import dircmp
 from pathlib import Path, PosixPath
 from typing import List, Optional, Set, Tuple
 
+import requests
+
+from . import get_version
+
 
 class DjangoMigrationsDiff:
     """Main class for Django Migrations Diff."""
+
+    package_name = 'django-migrations-diff'
 
     def __init__(self):
         """Initialize class instance."""
         self.args = sys.argv[1:]
         self.empty = '---'
         self.app_title = 'APPLICATION'
+        self.time_format = '%d.%m.%Y %H:%M'
         self.names = []
+
+        self.version = get_version()
 
         self._current_dir = None
         self._app_dir = None
         self._snapshots_dir = None
+        self._last_check_file = None
 
         self._comparison = None
         self._apps = None
@@ -28,6 +38,7 @@ class DjangoMigrationsDiff:
 
     def run(self):
         """Run application."""
+
         # Show help
         if not self.args or 'help' in self.args[0]:
             return self.show_help()
@@ -203,9 +214,75 @@ class DjangoMigrationsDiff:
 
     def get_version(self):
         """Get current version."""
-        from . import get_version
+        self.print(f'\nCurrent version is <g>{self.version}</g>')
 
-        self.print(f'\nCurrent version is <g>{get_version()}</g>')
+        # Always check actual version on this command
+        actual_version = self.get_actual_version()
+        if not actual_version:
+            self.print('\n<r>Can\'t get latest version from server</r>')
+        if actual_version == self.version:
+            self.print('\nThis version is up-to-date')
+
+        self.set_last_check()
+
+    def check_new_version(self):
+        """Check if new version of app is available."""
+        last_check = self.get_last_check()
+        if last_check and (datetime.now() - last_check).seconds < 86400:
+            # Do not check more than once a day
+            return
+
+        self.get_actual_version()
+        self.set_last_check()
+
+    def get_actual_version(self) -> Optional[str]:
+        """Get actual version of app."""
+        actual_version = None
+
+        try:
+            response = requests.get(
+                f'https://pypi.org/pypi/{self.package_name}/json/',
+                timeout=10,
+            )
+            if response and response.status_code == 200:
+                data = response.json()
+                actual_version = data['info']['version']
+        except Exception:
+            pass
+
+        if actual_version and actual_version != self.version:
+            msg = (
+                f'New version {actual_version} is available! '
+                'Run this command to upgrade:'
+            )
+            self._spacing = [len(msg) + 1]
+            self.print_line(left='\n┌', delimiter='┬', right='┐')
+            self.print_line(msg, wraps=['y'])
+            self.print_line(
+                f'pip3 install --upgrade {self.package_name}', wraps=['y']
+            )
+            self.print_line(left='└', delimiter='┴', right='┘')
+
+        return actual_version
+
+    def get_last_check(self) -> Optional[datetime]:
+        """Get time of last version check."""
+        try:
+            with open(self.last_check_file, 'r') as f:
+                line = f.readline().strip()
+
+            return datetime.strptime(line, self.time_format)
+        except Exception:
+            pass
+
+    def set_last_check(self):
+        """Set time of last version check."""
+        try:
+            last_check = datetime.now().strftime(self.time_format)
+            with open(self.last_check_file, 'w') as f:
+                f.write(last_check)
+        except Exception:
+            pass
 
     # Helpers
 
@@ -235,6 +312,17 @@ class DjangoMigrationsDiff:
                 self._snapshots_dir.mkdir()
 
         return self._snapshots_dir
+
+    @property
+    def last_check_file(self) -> PosixPath:
+        """File with datetime of last version check.."""
+        if not self._last_check_file:
+            self._last_check_file = self.app_dir / 'last_check.mdiff'
+
+            if not self._last_check_file.exists():
+                self._snapshots_dir.touch()
+
+        return self._last_check_file
 
     @property
     def comparison(self) -> dict:
@@ -418,16 +506,17 @@ class DjangoMigrationsDiff:
     def get_created_date(
         self,
         path: PosixPath,
-        date_format='%d.%m.%Y %H:%M',
     ) -> str:
         """Get date and time whenfile/directory was created."""
         date = datetime.fromtimestamp(path.stat().st_ctime)
-        return date.strftime(date_format)
+        return date.strftime(self.time_format)
 
 
 def main():
     """Main function that runs application."""
-    DjangoMigrationsDiff().run()
+    app = DjangoMigrationsDiff()
+    app.run()
+    app.check_new_version()
 
 
 if __name__ == '__main__':
