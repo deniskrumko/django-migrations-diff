@@ -34,6 +34,7 @@ def lock():
 @task
 def install():
     """Install packages for local development."""
+    print('\npython3 -m pip install --user --upgrade twine')
     return local('pipenv install --dev')
 
 
@@ -52,6 +53,7 @@ def clean():
         f'{base_dir}/__pycache__',
         f'{base_dir}/snapshots',
         f'{base_dir}/.DS_Store',
+        f'{base_dir}/last_check.mdiff',
     )
     local('rm -rf ' + ' '.join(files))
 
@@ -61,15 +63,6 @@ def build():
     """Build package for pypy."""
     clean()
     local('python3 setup.py sdist bdist_wheel')
-
-
-@task
-def pip_dev():
-    """Show command how to install dev package."""
-    print(
-        f'pip3 install --index-url {test_pypy}/simple/ '
-        f'--no-deps {package_name}'
-    )
 
 
 @task
