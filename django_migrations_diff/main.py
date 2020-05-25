@@ -71,6 +71,7 @@ class DjangoMigrationsDiff:
 
     def create_snapshot(self, name: str):
         """Create new snapshot (or update old one)."""
+        name = self.escape_characters(name)
         new_snapshot_dir, created = None, None
         total_apps, total_files = 0, 0
 
@@ -129,6 +130,7 @@ class DjangoMigrationsDiff:
 
         # Remove specific snapshots
         self.print()
+        names = tuple(self.escape_characters(n) for n in names)
         for name in names:
             self.print(f'Snapshot {name} - ', end='')
             snapshot_dir = self.snapshots_dir / name
@@ -140,7 +142,7 @@ class DjangoMigrationsDiff:
 
     def compare_snapshots(self, *names: Tuple[str, ...]):
         """Compare migrations between several snapshots."""
-        self.names = names
+        self.names = tuple(self.escape_characters(n) for n in names)
         if len(self.names) > 2:
             # NOTE: maybe it's not needed to anyone?
             return self.print(
@@ -152,14 +154,14 @@ class DjangoMigrationsDiff:
 
         if not self.comparison:
             return self.print(
-                f'\nSnapshots <g>{names[0]}</g> and <g>{names[1]}</g> '
-                'are equal!'
+                f'\nSnapshots <g>{self.names[0]}</g> and '
+                f'<g>{self.names[1]}</g> are equal!'
             )
 
         self.print_line(left='┌', delimiter='┬', right='┐')
         self.print_line(
             self.app_title,
-            *[n.upper() for n in names],
+            *[n.upper() for n in self.names],
             wraps=['B'] * 3,
         )
 
@@ -295,6 +297,10 @@ class DjangoMigrationsDiff:
             pass
 
     # Helpers
+
+    def escape_characters(self, value: str) -> str:
+        """Remove restricted characters from value."""
+        return value.replace('/', '-')
 
     @property
     def current_dir(self) -> PosixPath:
