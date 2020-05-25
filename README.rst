@@ -43,6 +43,9 @@ How to use
     # Compare two snapshots
     mdiff <snapshot_1> <snapshot_2>
 
+    # Compare two snapshots (get number of diffent migrations)
+    mdiff <snapshot_1> <snapshot_2> --number
+
     # List of all snapshots
     mdiff list
 

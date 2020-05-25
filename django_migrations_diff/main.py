@@ -36,8 +36,15 @@ class DjangoMigrationsDiff:
         self._apps = None
         self._spacing = None
 
+        self._number_only = False
+
     def run(self):
         """Run application."""
+
+        # "Numbers only" keyword argument
+        if '--number' in self.args:
+            self._number_only = True
+            self.args.remove('--number')
 
         # Show help
         if not self.args or 'help' in self.args[0]:
@@ -139,6 +146,9 @@ class DjangoMigrationsDiff:
             return self.print(
                 '\n<r>Sorry, only 2 snapshots can be compared yet</r>'
             )
+
+        if self._number_only:
+            return print(len(self.comparison))
 
         if not self.comparison:
             return self.print(
