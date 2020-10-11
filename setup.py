@@ -23,6 +23,7 @@ setup(
     },
     packages=['django_migrations_diff'],
     python_requires=">=3.6",
+    install_requires=['requests'],
     keywords='CLI, Django, Migrations, Diff',
     classifiers=[
         'Development Status :: 4 - Beta',
