@@ -97,15 +97,13 @@ class DjangoMigrationsDiff:
                 total_apps += 1
 
         if not total_files:
-            return self.print(
-                f'\n<r>Can\'t find any migration in {self.current_dir}</r>'
-            )
+            return self.print(f'\n<r>Can\'t find any migration in {self.current_dir}</r>')
 
         action = 'created' if created else 'updated'
         return self.print(
             f'\nSnapshot <g>{name}</g> successfully {action}:\n'
             f'  - {total_apps} applications\n'
-            f'  - {total_files} migrations'
+            f'  - {total_files} migrations',
         )
 
     def remove_snapshots(self, *names: Tuple[str, ...]):
@@ -114,7 +112,7 @@ class DjangoMigrationsDiff:
             return self.print(
                 '\nmdiff rm <g>all</g>\t\t-- Remove all snapshots'
                 '\nmdiff rm <g><snapshot></g>\t-- Remove specific snapshots '
-                '(separate names by space)'
+                '(separate names by space)',
             )
 
         # Remove all snapshots
@@ -122,9 +120,7 @@ class DjangoMigrationsDiff:
             if not self.show_all_snapshots():
                 return
 
-            self.input(
-                f'\nRemove all snapshots? Press Enter to continue...', end=''
-            )
+            self.input('\nRemove all snapshots? Press Enter to continue...', end='')
             shutil.rmtree(self.snapshots_dir)
             return self.print('<g>OK!</g>')
 
@@ -136,18 +132,16 @@ class DjangoMigrationsDiff:
             snapshot_dir = self.snapshots_dir / name
             if snapshot_dir.exists():
                 shutil.rmtree(snapshot_dir)
-                self.print(f'<g>deleted</g>')
+                self.print('<g>deleted</g>')
             else:
-                self.print(f'<r>not found</r>')
+                self.print('<r>not found</r>')
 
     def compare_snapshots(self, *names: Tuple[str, ...]):
         """Compare migrations between several snapshots."""
         self.names = tuple(self.escape_characters(n) for n in names)
         if len(self.names) > 2:
             # NOTE: maybe it's not needed to anyone?
-            return self.print(
-                '\n<r>Sorry, only 2 snapshots can be compared yet</r>'
-            )
+            return self.print('\n<r>Sorry, only 2 snapshots can be compared yet</r>')
 
         if self._number_only:
             return print(len(self.comparison))
@@ -155,7 +149,7 @@ class DjangoMigrationsDiff:
         if not self.comparison:
             return self.print(
                 f'\nSnapshots <g>{self.names[0]}</g> and '
-                f'<g>{self.names[1]}</g> are equal!'
+                f'<g>{self.names[1]}</g> are equal!',
             )
 
         self.print_line(left='┌', delimiter='┬', right='┐')
@@ -169,7 +163,7 @@ class DjangoMigrationsDiff:
             self.print_line(left='├', delimiter='┼', right='┤')
             for index, filenames in enumerate(sorted(
                 files,
-                key=lambda x: x[0] if x[0] != self.empty else x[1]
+                key=lambda x: x[0] if x[0] != self.empty else x[1],
             )):
                 wraps = [None]  # app name is not wrapped
                 if filenames[0] == filenames[1]:
@@ -193,9 +187,7 @@ class DjangoMigrationsDiff:
             return False
 
         spacing = max(len(max(snapshots, key=len)), 4)
-        self.print(
-            f'\n<g>NAME{" " * spacing}APPS\tFILES\tDATE\t\t   SIZE</g>\n'
-        )
+        self.print(f'\n<g>NAME{" " * spacing}APPS\tFILES\tDATE\t\t   SIZE</g>\n')
         for snapshot in snapshots:
             total_apps, total_files, total_size = 0, 0, 0
             snapshot_dir = self.snapshots_dir / snapshot
@@ -213,7 +205,7 @@ class DjangoMigrationsDiff:
                 f'{snapshot}{" " * (spacing - len(snapshot) + 4)}'
                 f'{total_apps}\t{total_files}\t'
                 f'{self.get_created_date(snapshot_dir)}   '
-                f'{int(total_size)} kB'
+                f'{int(total_size)} kB',
             )
 
         return True
@@ -270,9 +262,7 @@ class DjangoMigrationsDiff:
             self._spacing = [len(msg) + 1]
             self.print_line(left='\n┌', delimiter='┬', right='┐')
             self.print_line(msg, wraps=['y'])
-            self.print_line(
-                f'pip3 install --upgrade {self.package_name}', wraps=['y']
-            )
+            self.print_line(f'pip3 install --upgrade {self.package_name}', wraps=['y'])
             self.print_line(left='└', delimiter='┴', right='┘')
 
         return actual_version
@@ -433,8 +423,8 @@ class DjangoMigrationsDiff:
         if new_snapshot_dir.exists():
             date = self.get_created_date(new_snapshot_dir)
             self.input(
-                f'\nSnapshot <g>{name}</g> ({date}) will be updated. '
-                'Press Enter to continue...', end=''
+                f'\nSnapshot <g>{name}</g> ({date}) will be updated. Press Enter to continue...',
+                end='',
             )
             shutil.rmtree(new_snapshot_dir)
             created = False
