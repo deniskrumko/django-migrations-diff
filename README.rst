@@ -78,3 +78,25 @@ it means that original migrations from "master" were deleted or changed.
 
 Yellow-labeled migration means that same migration exist in both snapshots
 but it was modified and now has different code.
+
+CI/CD configuration
+^^^^^^^^^^^^^^^^^^^
+
+`django-migrations-diff` also can be used to detect new migrations in CI/CD pipelines.
+For example, following stage in `.gitlab-ci.yml` will fail if there are new migrations in current
+branch in comparison to master branch.
+
+.. code-block:: bash
+  chechcheck:
+    stage: tests
+    script:
+      - pip install django-migrations-diff==2.0.4
+      - git merge-base origin/master HEAD | xargs git checkout
+      - mdiff master
+      - git checkout ${CI_COMMIT_REF_NAME}
+      - mdiff ${CI_COMMIT_REF_NAME}
+      - mdiff master ${CI_COMMIT_REF_NAME}
+      - (if [[ $(mdiff master ${CI_COMMIT_REF_NAME} --number) == 0 ]]; then echo "No new migrations"; else exit 1; fi;)
+    allow_failure: true
+
+NOTE: This is not full stage descriptions, this is only example.
