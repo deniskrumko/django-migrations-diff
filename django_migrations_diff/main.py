@@ -7,8 +7,6 @@ from filecmp import dircmp
 from pathlib import Path, PosixPath
 from typing import List, Optional, Set, Tuple
 
-import requests
-
 from . import get_version
 
 
@@ -199,13 +197,13 @@ class DjangoMigrationsDiff:
                     total_size += sum(
                         (root / filename).stat().st_size
                         for filename in files
-                    ) / 1000
+                    )
 
             self.print(
                 f'{snapshot}{" " * (spacing - len(snapshot) + 4)}'
                 f'{total_apps}\t{total_files}\t'
                 f'{self.get_created_date(snapshot_dir)}   '
-                f'{int(total_size)} kB',
+                f'{self.format_total_size(total_size)}',
             )
 
         return True
@@ -225,7 +223,7 @@ class DjangoMigrationsDiff:
         if not actual_version:
             self.print('\n<r>Can\'t get latest version from server</r>')
         if actual_version == self.version:
-            self.print('\nThis version is up-to-date')
+            self.print('\nThis version is <g>up-to-date</g>')
 
         self.set_last_check()
 
@@ -244,10 +242,13 @@ class DjangoMigrationsDiff:
         actual_version = None
 
         try:
-            response = requests.get(
-                f'https://pypi.org/pypi/{self.package_name}/json/',
-                timeout=10,
-            )
+            import requests
+        except (ModuleNotFoundError, ImportError):
+            self.print('\n<r>Package "requests" is not found. Cannot get actual version.</r>')
+            exit()
+
+        try:
+            response = requests.get(f'https://pypi.org/pypi/{self.package_name}/json/', timeout=10)
             if response and response.status_code == 200:
                 data = response.json()
                 actual_version = data['info']['version']
@@ -421,11 +422,6 @@ class DjangoMigrationsDiff:
         """Create directory for new snapshot (and remove old one if exists.)"""
         new_snapshot_dir = self.snapshots_dir / name
         if new_snapshot_dir.exists():
-            date = self.get_created_date(new_snapshot_dir)
-            self.input(
-                f'\nSnapshot <g>{name}</g> ({date}) will be updated. Press Enter to continue...',
-                end='',
-            )
             shutil.rmtree(new_snapshot_dir)
             created = False
 
@@ -516,6 +512,10 @@ class DjangoMigrationsDiff:
         """Get date and time whenfile/directory was created."""
         date = datetime.fromtimestamp(path.stat().st_ctime)
         return date.strftime(self.time_format)
+
+    def format_total_size(self, size: int) -> str:
+        """Format total snapshot size."""
+        return f'{int(size / 1000)} Kb' if size > 1000 else f'{size} bytes'
 
 
 def main():
