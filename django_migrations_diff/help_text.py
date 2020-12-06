@@ -13,4 +13,9 @@ HELP = """
   mdiff <g>rm all</g></b>\t\t\tRemove all snapshots
   mdiff <g>rm</g> <b><name_1></b> <b><name_2></b>\tRemove specific snapshots
 
+<g>Flags</g>
+
+  --number\t\t\tGet only number of diffent migrations
+  --width <b><N></b>\t\t\tSet max characters in line (<y>default: 120</y>)
+
 """.rstrip() # noqa

@@ -35,6 +35,7 @@ class DjangoMigrationsDiff:
         self._spacing = None
 
         self._number_only = False
+        self._max_width = 120
 
     def run(self):
         """Run application."""
@@ -43,6 +44,20 @@ class DjangoMigrationsDiff:
         if '--number' in self.args:
             self._number_only = True
             self.args.remove('--number')
+
+        # "Max width" flag
+        if '--width' in self.args:
+            try:
+                index = self.args.index('--width')
+                width_value = self.args[index + 1]
+                self._max_width = int(width_value)
+                self.args.pop(index)  # remove flag
+                self.args.pop(index)  # remove flag value
+            except Exception:
+                exit(self.print('\n<r>Invalid --width flag value.\nExample: --width 128</r>'))
+
+            if self._max_width < 30:
+                exit(self.print('\n<r>Width should be at least 30 to be readable'))
 
         # Show help
         if not self.args or 'help' in self.args[0]:
@@ -410,7 +425,12 @@ class DjangoMigrationsDiff:
                     if name_2 > max_name_2:
                         max_name_2 = name_2
 
-            self._spacing = max_app + 1, max_name_1 + 1, max_name_2 + 1
+            self._spacing = [max_app + 1, max_name_1 + 1, max_name_2 + 1]
+
+            # Reduce spacing to fit max width limitation
+            while sum(self._spacing) > self._max_width:
+                max_index = self._spacing.index(max(self._spacing))
+                self._spacing[max_index] -= 1
 
         return self._spacing
 
@@ -485,6 +505,9 @@ class DjangoMigrationsDiff:
             end = f'<D>{delimiter}</D>' if i + 1 != len(self.spacing) else ''
             if values:
                 value = values[i]
+                max_width = self.spacing[i]
+                if len(value) > max_width and value != self.empty:
+                    value = self.truncate_message(value, max_width, delimiter='...')
                 after_value = spacing - len(value)
                 if wraps:
                     wrapper = wraps[i]
@@ -516,6 +539,38 @@ class DjangoMigrationsDiff:
     def format_total_size(self, size: int) -> str:
         """Format total snapshot size."""
         return f'{int(size / 1000)} Kb' if size > 1000 else f'{size} bytes'
+
+    def truncate_message(
+        self,
+        message: str,
+        max_length: int = 1000,
+        delimiter: str = ' ... ',
+        cut_end: bool = False,
+    ):
+        """Truncate long messages.
+
+        Examples of use:
+            >>> self.truncate_message('a' * 100, max_length=15)
+            'aaaaaaa ... aa'
+
+            >>> self.truncate_message('a' * 100, max_length=15, cut_end=True)
+            'aaaaaaaaaa ... '
+
+            >>> self.truncate_message('a' * 15, max_length=15)
+            'aaaaaaaaaaaaaaa'
+        """
+        if len(message) <= max_length:
+            return message
+
+        if cut_end:
+            return message[:max_length - len(delimiter)] + delimiter
+
+        first_part = max_length // 2
+        second_part = first_part - len(delimiter)
+        if second_part < 1:
+            return message[:first_part] + delimiter
+
+        return message[:first_part] + delimiter + message[-second_part:]
 
 
 def main():
