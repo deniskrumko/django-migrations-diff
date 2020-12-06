@@ -107,7 +107,7 @@ branch in comparison to master branch.
   chechcheck:
     stage: tests
     script:
-      - pip install django-migrations-diff==2.0.4
+      - pip install django-migrations-diff==2.0.4  # PLEASE, CHECK CURRENT VERSION
       - git merge-base origin/master HEAD | xargs git checkout
       - mdiff master
       - git checkout ${CI_COMMIT_REF_NAME}
