@@ -33,6 +33,7 @@ class DjangoMigrationsDiff:
         self._comparison = None
         self._apps = None
         self._spacing = None
+        self._statistics = None
 
         self._number_only = False
         self._max_width = 120
@@ -40,7 +41,7 @@ class DjangoMigrationsDiff:
     def run(self):
         """Run application."""
 
-        # "Numbers only" keyword argument
+        # "Numbers only" flag
         if '--number' in self.args:
             self._number_only = True
             self.args.remove('--number')
@@ -187,6 +188,11 @@ class DjangoMigrationsDiff:
                 self.print_line('' if index else app, *filenames, wraps=wraps)
 
         self.print_line(left='└', delimiter='┴', right='┘')
+        self.print(
+            f' Stats for snapshot {self.names[1]}: <g>+{self._statistics[0]}</g> '
+            f'<r>-{self._statistics[1]}</r> '
+            f'<y>*{self._statistics[2]}</y>',
+        )
 
     def show_all_snapshots(self) -> bool:
         """Show all existing snapshots.
@@ -383,7 +389,22 @@ class DjangoMigrationsDiff:
                     for filename in compare.diff_files:
                         self._comparison[app].append((filename, filename))
 
+            self.update_statistics()
         return self._comparison
+
+    def update_statistics(self):
+        """Update `self._statistics` values."""
+        # Added, deleted, updated
+        self._statistics = [0, 0, 0]
+
+        for app in self._comparison.values():
+            for line in app:
+                for i, value in enumerate(line):
+                    if value == self.empty:
+                        self._statistics[i] += 1  # New migration or deleted migration
+
+                if len(set(line)) == 1:
+                    self._statistics[2] += 1  # Both changed
 
     @property
     def apps(self) -> Set[str]:
