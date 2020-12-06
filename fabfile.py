@@ -13,13 +13,13 @@ package_name = 'django-migrtaions-diff'
 @task
 def isort():
     """Fix imports formatting."""
-    local(f'isort {base_dir} -y -rc')
+    local(f'isort {base_dir}')
 
 
 @task
 def pep8(path=base_dir):
     """Check PEP8 errors."""
-    return local(f'flake8 --config=.flake8 {path}')
+    return local(f'flake8 {path}')
 
 
 # Pipenv
@@ -68,12 +68,10 @@ def build():
 @task
 def upload_to_dev():
     """Upload package to dev pypy."""
-    local(
-        f'python3 -m twine upload --repository-url {test_pypy}/legacy/ dist/*'
-    )
+    local(f'python3 -m twine upload --repository-url {test_pypy}/legacy/ dist/*')
 
 
 @task
 def upload_to_prod():
     """Upload package to real pypy."""
-    local(f'python3 -m twine upload dist/*')
+    local('python3 -m twine upload dist/*')
