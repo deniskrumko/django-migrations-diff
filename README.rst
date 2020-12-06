@@ -93,7 +93,7 @@ Explanation:
 1. Snapshot MASTER has 0004_migration.py but DEVELOP misses it
 2. Snapshot DEVELOP has 0005_migration.py but MASTER misses it
 3. Both MASTER and DEVELOP have 0003_migration.py migration, but it differs inside
-4. Stats show that DEVELOP snapshot has 1 new (+1), 1 missing (-1) and 1 changed (*1) migration
+4. Stats show that DEVELOP snapshot has 1 new, 1 missing and 1 changed migration
 
 CI/CD configuration
 ^^^^^^^^^^^^^^^^^^^
