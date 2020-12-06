@@ -73,11 +73,27 @@ For example, you need to compare "master" and "develop" branches.
 
   mdiff master develop # compare two snapshots
 
-In output you expect to see only new migrations in "develop" branch, otherwise
-it means that original migrations from "master" were deleted or changed.
 
-Yellow-labeled migration means that same migration exist in both snapshots
-but it was modified and now has different code.
+Output will be like:
+
+.. code-block:: bash
+
+  ┌─────────────┬───────────────────┬───────────────────┐
+  │ APPLICATION │ MASTER            │ DEVELOP           │
+  ├─────────────┼───────────────────┼───────────────────┤
+  │ app.authors │ 0004_migration.py │ ---               │
+  │             │ ---               │ 0005_migration.py │
+  ├─────────────┼───────────────────┼───────────────────┤
+  │ app.users   │ 0003_migration.py │ 0003_migration.py │
+  └─────────────┴───────────────────┴───────────────────┘
+   Stats for snapshot DEVELOP: +1 -1 *1
+
+Explanation:
+
+1. Snapshot MASTER has 0004_migration.py but DEVELOP misses it
+2. Snapshot DEVELOP has 0005_migration.py but MASTER misses it
+3. Both MASTER and DEVELOP have 0003_migration.py migration, but it differs inside
+4. Stats show that DEVELOP snapshot has 1 new (+1), 1 missing (-1) and 1 changed (*1) migration
 
 CI/CD configuration
 ^^^^^^^^^^^^^^^^^^^
